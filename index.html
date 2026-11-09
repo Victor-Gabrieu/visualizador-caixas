@@ -1,59 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Denise Lins | Visualização 3D</title>
 
-```javascript
-// Depois de carregar o modelo GLB:
-const clip = gltf.animations[0];
-const mixer = new THREE.AnimationMixer(gltf.scene);
-const action = mixer.clipAction(clip);
+  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
 
-action.play();
+  <style>
+    body {
+      margin: 0;
+      background: #f7f5f1;
+      font-family: Arial, sans-serif;
+      color: #514a43;
+      text-align: center;
+    }
+    header { padding: 32px 16px 10px; }
+    h1 {
+      font-family: Georgia, serif;
+      font-size: 25px;
+      font-weight: normal;
+      letter-spacing: 2px;
+      margin: 0;
+    }
+    p { font-size: 13px; letter-spacing: 1px; }
+    model-viewer {
+      width: 100%;
+      height: 65vh;
+      min-height: 400px;
+      background: #f7f5f1;
+      cursor: pointer;
+    }
+    #toggle-animation {
+      margin: 12px auto;
+      padding: 11px 22px;
+      border: 1px solid #8b7967;
+      border-radius: 25px;
+      background: transparent;
+      color: #514a43;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    #toggle-animation:hover { background: #eae4dc; }
+    #toggle-animation[hidden] { display: none; }
+    footer { padding: 20px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>DENISE LINS</h1>
+    <p>CONVITES & PAPELARIA PERSONALIZADA</p>
+  </header>
 
-let tempo = 0;
-let direcao = 0; // 0 = parado, 1 = abrindo, -1 = fechando
-const duracao = clip.duration;
+  <model-viewer
+    id="viewer"
+    src="caixa-denise-lins.glb"
+    alt="Modelo tridimensional da caixa personalizada"
+    camera-controls
+    auto-rotate
+    shadow-intensity="1"
+    environment-image="neutral"
+    exposure="1"
+    interaction-prompt="auto">
+  </model-viewer>
 
-// Começa com a caixa fechada
-mixer.setTime(0);
+  <button id="toggle-animation" type="button" hidden>Abrir caixa</button>
 
-// Alterna entre abrir e fechar
-function alternarCaixa() {
-  if (direcao !== 0) return; // espera terminar
+  <footer>
+    Toque na caixa para abrir ou fechar • Arraste para girar • Aproximar com dois dedos
+    <p>Apresentação exclusiva do seu projeto</p>
+  </footer>
 
-  direcao = tempo >= duracao ? -1 : 1;
-}
+  <script>
+    const viewer = document.querySelector('#viewer');
+    const button = document.querySelector('#toggle-animation');
 
-// Detecta cliques na caixa
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
+    let duration = 0;
+    let opened = false;
+    let animating = false;
+    let frameId = null;
+    let pointerStart = null;
 
-renderer.domElement.addEventListener("pointerup", (event) => {
-  const rect = renderer.domElement.getBoundingClientRect();
+    viewer.addEventListener('load', () => {
+      if (!viewer.availableAnimations.length) {
+        button.hidden = true;
+        return;
+      }
 
-  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      viewer.animationName = viewer.availableAnimations[0];
+      viewer.pause();
+      viewer.currentTime = 0;
+      duration = viewer.duration;
+      opened = false;
+      animating = false;
+      button.textContent = 'Abrir caixa';
+      button.hidden = !(duration > 0);
+    });
 
-  raycaster.setFromCamera(mouse, camera);
+    function toggleBox() {
+      if (animating || !(duration > 0)) return;
 
-  const objetos = raycaster.intersectObject(gltf.scene, true);
+      animating = true;
+      button.disabled = true;
 
-  if (objetos.length > 0) {
-    alternarCaixa();
-  }
-});
+      const startTime = performance.now();
+      const from = viewer.currentTime;
+      const to = opened ? 0 : duration;
+      const travel = Math.abs(to - from);
+      const travelMs = travel * 1000;
 
-// Chame esta função dentro do loop de renderização existente
-function atualizarAnimacao(delta) {
-  if (direcao === 0) return;
+      function step(now) {
+        const progress = travelMs > 0
+          ? Math.min((now - startTime) / travelMs, 1)
+          : 1;
 
-  tempo = THREE.MathUtils.clamp(
-    tempo + delta * direcao,
-    0,
-    duracao
-  );
+        viewer.currentTime = from + (to - from) * progress;
 
-  mixer.setTime(tempo);
+        if (progress < 1) {
+          frameId = requestAnimationFrame(step);
+        } else {
+          viewer.currentTime = to;
+          opened = !opened;
+          animating = false;
+          button.disabled = false;
+          button.textContent = opened ? 'Fechar caixa' : 'Abrir caixa';
+          frameId = null;
+        }
+      }
+      frameId = requestAnimationFrame(step);
+    }
 
-  if (tempo === 0 || tempo === duracao) {
-    direcao = 0;
-  }
-}
-```
+    button.addEventListener('click', toggleBox);
+
+    // Toque curto alterna; arrastar para girar não dispara a animação.
+    viewer.addEventListener('pointerdown', (event) => {
+      pointerStart = { x: event.clientX, y: event.clientY };
+    });
+
+    viewer.addEventListener('pointerup', (event) => {
+      if (!pointerStart) return;
+      const distance = Math.hypot(
+        event.clientX - pointerStart.x,
+        event.clientY - pointerStart.y
+      );
+      pointerStart = null;
+      if (distance <= 8) toggleBox();
+    });
+
+    viewer.addEventListener('pointercancel', () => { pointerStart = null; });
+  </script>
+</body>
+</html>
