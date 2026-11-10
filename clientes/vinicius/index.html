@@ -32,6 +32,7 @@
     let open = false;
     let moving = false;
     let animationFrame = null;
+    let endTime = 0; // Último instante seguro, antes de reiniciar o loop
 
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -62,6 +63,7 @@
         status.textContent = 'O navegador não conseguiu ler a duração da animação do GLB.';
         return;
       }
+      endTime = Math.max(0, duration - Math.min(0.016, duration / 100));
       viewer.pause();
       viewer.currentTime = 0;
       status.textContent = '';
@@ -79,10 +81,10 @@
       if (moving || !duration) return;
       moving = true;
       button.disabled = true;
-      const from = open ? duration : 0;
-      const to = open ? 0 : duration;
+      const from = open ? endTime : 0;
+      const to = open ? 0 : endTime;
       const start = performance.now();
-      const animationMs = duration * 1000;
+      const animationMs = Math.abs(to - from) * 1000;
       viewer.pause();
 
       function tick(now) {
