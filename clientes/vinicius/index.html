@@ -23,6 +23,7 @@
   <model-viewer id="viewer" src="caixa.glb" alt="Modelo tridimensional da caixa personalizada" camera-controls auto-rotate shadow-intensity="1" environment-image="neutral" exposure="1" interaction-prompt="auto"></model-viewer>
   <button id="toggle-animation" type="button" disabled>Carregando animação...</button>
   <p id="status" role="status" aria-live="polite"></p>
+  <audio id="musica" src="musica.mp3" loop preload="auto"></audio>
   <footer>Arraste para girar • Aproximar com dois dedos<p>Apresentação exclusiva do seu projeto</p></footer>
   <script>
     const viewer = document.querySelector('#viewer');
@@ -103,6 +104,28 @@
       }
       animationFrame = requestAnimationFrame(tick);
     });
+
+    // Música ambiente: começa após a primeira interação permitida pelo navegador.
+    const musica = document.querySelector('#musica');
+    musica.volume = 0.4;
+    let iniciandoMusica = false;
+
+    function iniciarMusica() {
+      if (!musica.paused || iniciandoMusica) return;
+      iniciandoMusica = true;
+      musica.play().then(() => {
+        document.removeEventListener('pointerdown', iniciarMusica);
+        document.removeEventListener('keydown', iniciarMusica);
+      }).catch(() => {
+        // Se o navegador bloquear ou o arquivo não estiver pronto,
+        // uma próxima interação poderá tentar novamente.
+      }).finally(() => {
+        iniciandoMusica = false;
+      });
+    }
+
+    document.addEventListener('pointerdown', iniciarMusica);
+    document.addEventListener('keydown', iniciarMusica);
   </script>
 </body>
 </html>
